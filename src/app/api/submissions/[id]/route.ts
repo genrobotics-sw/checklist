@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
+import { revalidatePath } from 'next/cache'
 
 export async function POST(
   request: Request,
@@ -92,13 +93,50 @@ export async function POST(
             })
           }
         }
+
+        // Handle videos if any
+        if (item.videos && Array.isArray(item.videos)) {
+          const existingVideos = await tx.video.findMany({
+            where: { submissionItemId: subItem.id }
+          })
+          
+          const newPaths = new Set(item.videos.map((v: any) => v.path))
+          const removedVideos = existingVideos.filter(v => !newPaths.has(v.storagePath))
+          
+          // Use a different array for video deletion if buckets are different
+          // Actually, we can just delete from checklist-videos bucket
+          if (removedVideos.length > 0) {
+            const { error } = await supabase.storage
+              .from('checklist-videos')
+              .remove(removedVideos.map(v => v.storagePath))
+            if (error) console.error("Failed to delete orphaned videos:", error)
+          }
+
+          await tx.video.deleteMany({
+            where: { submissionItemId: subItem.id }
+          })
+          
+          if (item.videos.length > 0) {
+            await tx.video.createMany({
+              data: item.videos.map((v: any) => ({
+                submissionId,
+                submissionItemId: subItem.id,
+                storagePath: v.path,
+                fileName: v.name || 'video.mp4'
+              }))
+            })
+          }
+        }
       }
 
       // Update submission status
       if (submitForReview) {
         await tx.checklistSubmission.update({
           where: { id: submissionId },
-          data: { status: 'SUBMITTED' }
+          data: { 
+            status: 'SUBMITTED',
+            submittedAt: new Date()
+          }
         })
 
         // Add history
@@ -116,6 +154,14 @@ export async function POST(
       timeout: 30000  // default is 5000 (5 seconds)
     })
 
+    // Invalidate cached pages so fresh data is shown on next visit.
+    revalidatePath('/employee/checklists')
+    revalidatePath('/employee/dashboard')
+    if (submitForReview) {
+      revalidatePath('/admin/submissions')
+      revalidatePath('/admin/dashboard')
+    }
+
     // Cleanup: Physically delete abandoned files from Supabase Storage
     if (filesToDelete.length > 0) {
       const { error: storageError } = await supabase.storage
@@ -130,7 +176,7 @@ export async function POST(
     if (submitForReview) {
       // Fire-and-forget: don't block the response waiting for email
       prisma.profile.findMany({
-        where: { role: 'ADMIN', isActive: true },
+        where: { role: { in: ['ADMIN', 'REVIEWER'] }, isActive: true },
         select: { email: true }
       }).then(admins => {
         for (const admin of admins) {

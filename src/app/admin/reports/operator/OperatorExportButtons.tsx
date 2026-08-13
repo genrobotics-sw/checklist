@@ -9,7 +9,13 @@ import { formatDate } from '@/lib/utils'
 const statusLabel = (s: string) =>
   ({ APPROVED: 'Approved', REJECTED: 'Rejected', SUBMITTED: 'Pending Review', DRAFT: 'Draft' }[s] ?? s)
 
-export function ExportButtons({ submissions }: { submissions: any[] }) {
+export function OperatorExportButtons({
+  submissions,
+  operatorName,
+}: {
+  submissions: any[]
+  operatorName: string
+}) {
   const [notice, setNotice] = useState<string | null>(null)
 
   const showNotice = (msg: string) => {
@@ -17,9 +23,12 @@ export function ExportButtons({ submissions }: { submissions: any[] }) {
     setTimeout(() => setNotice(null), 3500)
   }
 
+  const slug = operatorName.toLowerCase().replace(/\s+/g, '_')
+  const dateStr = new Date().toISOString().split('T')[0]
+
   const handleExportCSV = () => {
     if (submissions.length === 0) {
-      showNotice('No data to export — try clearing your filters.')
+      showNotice('No data to export.')
       return
     }
 
@@ -36,21 +45,19 @@ export function ExportButtons({ submissions }: { submissions: any[] }) {
       0
     )
 
-    const baseHeaders = ['Template', 'Operator', 'Reviewer', 'Location', 'Due Date', 'Submitted On', 'Status']
+    const baseHeaders = ['Template', 'Due Date', 'Submitted On', 'Reviewer', 'Status']
     const photoHeaders = Array.from({ length: maxPhotos }, (_, i) => `Photo ${i + 1}`)
     const headers = [...baseHeaders, ...photoHeaders]
 
     const rows = submissions.map(s => {
       const row = [
         s.assignment?.template?.title ?? 'Unknown',
-        s.submittedBy?.fullName ?? 'Unknown',
-        s.reviewedBy?.fullName ?? '-',
-        s.location ?? 'Not Specified',
         s.assignment?.dueDate ? formatDate(s.assignment.dueDate) : '—',
         s.submittedAt ? formatDate(s.submittedAt) : '—',
+        s.reviewedBy?.fullName ?? '—',
         statusLabel(s.status),
       ]
-      
+
       const photoUrls: string[] = []
       if (s.items) {
         s.items.forEach((item: any) => {
@@ -62,7 +69,6 @@ export function ExportButtons({ submissions }: { submissions: any[] }) {
         })
       }
 
-      // Pad with empty strings if this submission has fewer photos than maxPhotos
       while (photoUrls.length < maxPhotos) photoUrls.push('')
 
       return [...row, ...photoUrls]
@@ -77,7 +83,7 @@ export function ExportButtons({ submissions }: { submissions: any[] }) {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', `g-list_report_${new Date().toISOString().split('T')[0]}.csv`)
+    link.setAttribute('download', `g-list_${slug}_${dateStr}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -85,66 +91,81 @@ export function ExportButtons({ submissions }: { submissions: any[] }) {
 
   const handleExportPDF = () => {
     if (submissions.length === 0) {
-      showNotice('No data to export — try clearing your filters.')
+      showNotice('No data to export.')
       return
     }
 
     const doc = new jsPDF({ orientation: 'landscape' })
     doc.setFontSize(18)
-    doc.text('G-list Submission Report', 14, 20)
+    doc.text(`Operator Report — ${operatorName}`, 14, 20)
     doc.setFontSize(10)
     doc.setTextColor(120)
-    doc.text(`Generated: ${formatDate(new Date())}  ·  ${submissions.length} record${submissions.length !== 1 ? 's' : ''}`, 14, 27)
+    doc.text(
+      `Generated: ${formatDate(new Date())}  ·  ${submissions.length} record${submissions.length !== 1 ? 's' : ''}`,
+      14,
+      27
+    )
+
+    const approved = submissions.filter(s => s.status === 'APPROVED').length
+    const rejected = submissions.filter(s => s.status === 'REJECTED').length
+    const pending  = submissions.filter(s => s.status === 'SUBMITTED').length
+    const drafts   = submissions.filter(s => s.status === 'DRAFT').length
+
+    doc.setTextColor(0)
+    doc.setFontSize(9)
+    doc.text(`Approved: ${approved}   Rejected: ${rejected}   Pending: ${pending}   Drafts: ${drafts}`, 14, 34)
 
     autoTable(doc, {
-      startY: 33,
-      head: [['Template', 'Operator', 'Reviewer', 'Due Date', 'Submitted On', 'Status', 'Photos']],
+      startY: 40,
+      head: [['Template', 'Due Date', 'Submitted On', 'Reviewer', 'Status', 'Media']],
       body: submissions.map(s => {
-        let photoCount = 0
+        let mediaCount = 0
         if (s.items) {
           s.items.forEach((item: any) => {
-            if (item.photos) photoCount += item.photos.length
+            if (item.photos) mediaCount += item.photos.length
+            if (item.videos) mediaCount += item.videos.length
           })
         }
-
+        
         return [
           s.assignment?.template?.title ?? 'Unknown',
-          s.submittedBy?.fullName ?? 'Unknown',
-          s.reviewedBy?.fullName ?? '-',
           s.assignment?.dueDate ? formatDate(s.assignment.dueDate) : '—',
           s.submittedAt ? formatDate(s.submittedAt) : '—',
+          s.reviewedBy?.fullName ?? '—',
           statusLabel(s.status),
-          photoCount > 0 ? `${photoCount} (Click to view)` : '0'
+          mediaCount > 0 ? 'Link' : '—'
         ]
       }),
       theme: 'grid',
       headStyles: { fillColor: [79, 70, 229], fontSize: 9 },
-      bodyStyles: { fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
       alternateRowStyles: { fillColor: [248, 248, 250] },
       willDrawCell: (data: any) => {
-        if (data.section === 'body' && data.column.index === 6) {
+        if (data.section === 'body' && data.column.index === 5) {
           const submission = submissions[data.row.index]
-          let photoCount = 0
+          let mediaCount = 0
           if (submission.items) {
             submission.items.forEach((item: any) => {
-              if (item.photos) photoCount += item.photos.length
+              if (item.photos) mediaCount += item.photos.length
+              if (item.videos) mediaCount += item.videos.length
             })
           }
-          if (photoCount > 0) {
+          if (mediaCount > 0) {
             doc.setTextColor(37, 99, 235) // blue-600
           }
         }
       },
       didDrawCell: (data: any) => {
-        if (data.section === 'body' && data.column.index === 6) {
+        if (data.section === 'body' && data.column.index === 5) {
           const submission = submissions[data.row.index]
-          let photoCount = 0
+          let mediaCount = 0
           if (submission.items) {
             submission.items.forEach((item: any) => {
-              if (item.photos) photoCount += item.photos.length
+              if (item.photos) mediaCount += item.photos.length
+              if (item.videos) mediaCount += item.videos.length
             })
           }
-          if (photoCount > 0) {
+          if (mediaCount > 0) {
             const url = `${window.location.origin}/admin/submissions/${submission.id}`
             doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url })
           }
@@ -152,7 +173,7 @@ export function ExportButtons({ submissions }: { submissions: any[] }) {
       },
     })
 
-    doc.save(`g-list_report_${new Date().toISOString().split('T')[0]}.pdf`)
+    doc.save(`g-list_${slug}_${dateStr}.pdf`)
   }
 
   return (
@@ -167,7 +188,7 @@ export function ExportButtons({ submissions }: { submissions: any[] }) {
           onClick={handleExportCSV}
           className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-md hover:bg-zinc-50 transition-colors"
         >
-          <Download className="w-4 h-4" /> Export CSV / Excel
+          <Download className="w-4 h-4" /> Export CSV
         </button>
         <button
           onClick={handleExportPDF}

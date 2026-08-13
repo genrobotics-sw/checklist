@@ -8,13 +8,15 @@ const itemSchema = z.object({
   description: z.string().optional(),
   type: z.enum(['REQUIRED', 'OPTIONAL']),
   sortOrder: z.number().int(),
-  requiresPhoto: z.boolean()
+  requiresPhoto: z.boolean(),
+  requiresVideo: z.boolean().default(false)
 })
 
 const createTemplateSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   category: z.string().min(1),
+  isAuditTemplate: z.boolean().default(false),
   items: z.array(itemSchema).min(1)
 })
 
@@ -45,6 +47,7 @@ export async function POST(request: Request) {
         title: validatedData.title,
         description: validatedData.description,
         category: validatedData.category,
+        isAuditTemplate: validatedData.isAuditTemplate,
         createdById: user.id,
         items: {
           create: validatedData.items

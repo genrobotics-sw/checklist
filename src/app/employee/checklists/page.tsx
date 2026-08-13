@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { CheckCircle2, Clock, ArrowRight, Inbox } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
-export const dynamic = 'force-dynamic'
+// Data is cached by Next.js and revalidated by revalidatePath after mutations.
 
 export default async function EmployeeChecklistsPage() {
   const supabase = await createClient()

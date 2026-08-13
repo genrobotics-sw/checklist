@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Camera, Send, Save, MapPin, AlertCircle, CheckCircle2, MessageSquare, Loader2, X, Pencil } from 'lucide-react'
+import { Camera, Video, Send, Save, MapPin, AlertCircle, CheckCircle2, MessageSquare, Loader2, X, Pencil, PlayCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import imageCompression from 'browser-image-compression'
@@ -14,6 +14,7 @@ type Item = {
   description?: string | null
   type: 'REQUIRED' | 'OPTIONAL'
   requiresPhoto: boolean
+  requiresVideo: boolean
 }
 
 type PhotoData = {
@@ -28,6 +29,7 @@ type SubmissionItem = {
   isChecked: boolean
   note?: string | null
   photos?: PhotoData[]
+  videos?: PhotoData[]
 }
 
 export function ChecklistForm({ 
@@ -56,6 +58,7 @@ export function ChecklistForm({
   const [formData, setFormData] = useState<Record<string, SubmissionItem>>(initialData)
   const [location, setLocation] = useState(initialLocation || '')
   const [uploadingItem, setUploadingItem] = useState<string | null>(null)
+  const [uploadingVideoItem, setUploadingVideoItem] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [annotatingFile, setAnnotatingFile] = useState<{ itemId: string, file: File } | null>(null)
@@ -165,12 +168,78 @@ export function ChecklistForm({
     }
   }
 
+  const handleVideoUpload = async (itemId: string, file: File) => {
+    if (isReadOnly) return
+
+    const MAX_FILE_SIZE_MB = 50
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      setItemErrors(prev => ({ ...prev, [`upload_video_${itemId}`]: `Video exceeds ${MAX_FILE_SIZE_MB}MB limit.` }))
+      return
+    }
+
+    // Check video duration — must be ≤ 10 seconds
+    const durationOk = await new Promise<boolean>(resolve => {
+      const tempUrl = URL.createObjectURL(file)
+      const vid = document.createElement('video')
+      vid.preload = 'metadata'
+      vid.onloadedmetadata = () => {
+        URL.revokeObjectURL(tempUrl)
+        resolve(vid.duration <= 10)
+      }
+      vid.onerror = () => { URL.revokeObjectURL(tempUrl); resolve(false) }
+      vid.src = tempUrl
+    })
+
+    if (!durationOk) {
+      setItemErrors(prev => ({ ...prev, [`upload_video_${itemId}`]: 'Video must be 10 seconds or less.' }))
+      return
+    }
+
+    try {
+      setUploadingVideoItem(itemId)
+      setItemErrors(prev => { const n = { ...prev }; delete n[`upload_video_${itemId}`]; return n })
+
+      const fileExt = file.name.split('.').pop() || 'mp4'
+      const fileName = `${submissionId}/${itemId}-${Date.now()}.${fileExt}`
+
+      const { error } = await supabase.storage
+        .from('checklist-videos')
+        .upload(fileName, file, {
+          upsert: true,
+        })
+
+      if (error) throw error
+
+      const { data: { publicUrl } } = supabase.storage.from('checklist-videos').getPublicUrl(fileName)
+      const newVideo = { url: publicUrl, path: fileName, name: file.name }
+      
+      setFormData(prev => {
+        const existing = prev[itemId] || { itemId, isChecked: false }
+        return { ...prev, [itemId]: { ...existing, videos: [...(existing.videos || []), newVideo] } }
+      })
+    } catch (error: any) {
+      console.error('Error during video processing:', error)
+      setItemErrors(prev => ({ ...prev, [`upload_video_${itemId}`]: 'Could not upload video. Please try again.' }))
+    } finally {
+      setUploadingVideoItem(null)
+    }
+  }
+
   const removePhoto = (itemId: string, indexToRemove: number) => {
     if (isReadOnly) return
     setFormData(prev => {
       const existing = prev[itemId]
       if (!existing || !existing.photos) return prev
       return { ...prev, [itemId]: { ...existing, photos: existing.photos.filter((_, idx) => idx !== indexToRemove) } }
+    })
+  }
+
+  const removeVideo = (itemId: string, indexToRemove: number) => {
+    if (isReadOnly) return
+    setFormData(prev => {
+      const existing = prev[itemId]
+      if (!existing || !existing.videos) return prev
+      return { ...prev, [itemId]: { ...existing, videos: existing.videos.filter((_, idx) => idx !== indexToRemove) } }
     })
   }
 
@@ -197,6 +266,8 @@ export function ChecklistForm({
               newErrors[item.id] = 'This item must be checked before submitting.'
             } else if (item.requiresPhoto && (!ans.photos || ans.photos.length === 0)) {
               newErrors[item.id] = 'A photo is required for this item.'
+            } else if (item.requiresVideo && (!ans.videos || ans.videos.length === 0)) {
+              newErrors[item.id] = 'A video is required for this item.'
             }
           }
         }
@@ -222,7 +293,9 @@ export function ChecklistForm({
         throw new Error(err.error || 'Failed to save')
       }
 
-      router.refresh()
+      // Only navigate away when actually submitting for review.
+      // Draft saves keep the user on the same page — the client state
+      // is already up to date, so no server re-render is needed.
       if (submitForReview) router.push('/employee/checklists')
     } catch (error: any) {
       console.error(error)
@@ -236,9 +309,9 @@ export function ChecklistForm({
   return (
     <>
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.2 }}
         className="space-y-4 pb-36"
       >
         {/* Header Card */}
@@ -333,16 +406,15 @@ export function ChecklistForm({
             const ans = formData[item.id] || { itemId: item.id, isChecked: false }
             const isChecked = ans.isChecked
             const photos = ans.photos || []
+            const videos = ans.videos || []
             const isUploading = uploadingItem === item.id
-            const itemError = itemErrors[item.id]
+            const isUploadingVideo = uploadingVideoItem === item.id
+            const itemError = itemErrors[item.id] || itemErrors[`upload_${item.id}`] || itemErrors[`upload_video_${item.id}`]
 
             return (
-              <motion.div
+              <div
                 key={item.id}
                 id={`item-${item.id}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.04, duration: 0.25 }}
                 className={`rounded-2xl border-2 transition-all duration-200 overflow-hidden ${
                   itemError
                     ? 'border-rose-400 bg-rose-50/40'
@@ -395,6 +467,11 @@ export function ChecklistForm({
                           <Camera className="w-2.5 h-2.5" /> Photo
                         </span>
                       )}
+                      {item.requiresVideo && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-medium bg-zinc-100 text-zinc-600">
+                          <Video className="w-2.5 h-2.5" /> Video
+                        </span>
+                      )}
                     </div>
                     {item.description && (
                       <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{item.description}</p>
@@ -402,13 +479,13 @@ export function ChecklistForm({
                   </div>
                 </button>
 
-                {/* Photo Section */}
-                {item.requiresPhoto && (
+                {/* Photo & Video Section */}
+                {(item.requiresPhoto || item.requiresVideo) && (
                   <div className="px-4 pb-3 pt-1 border-t border-zinc-100">
                     <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                       {/* Existing Photos */}
                       {photos.map((photo, idx) => (
-                        <div key={idx} className="relative shrink-0">
+                        <div key={`photo-${idx}`} className="relative shrink-0">
                           <button
                             type="button"
                             onClick={() => setPreviewPhoto(photo.url)}
@@ -432,8 +509,32 @@ export function ChecklistForm({
                         </div>
                       ))}
 
-                      {/* Upload Button */}
-                      {!isReadOnly && (
+                      {/* Existing Videos */}
+                      {videos.map((video, idx) => (
+                        <div key={`video-${idx}`} className="relative shrink-0">
+                          <a
+                            href={video.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block h-20 w-20 bg-zinc-800 rounded-xl border border-zinc-200 overflow-hidden flex flex-col items-center justify-center text-zinc-300 hover:bg-zinc-700 transition"
+                          >
+                            <PlayCircle className="w-6 h-6 mb-1 shrink-0" />
+                            <span className="text-[9px] font-medium w-full px-1 text-center truncate">{video.name}</span>
+                          </a>
+                          {!isReadOnly && (
+                            <button
+                              type="button"
+                              onClick={() => removeVideo(item.id, idx)}
+                              className="absolute -top-1.5 -right-1.5 bg-white text-red-500 rounded-full w-5 h-5 flex items-center justify-center shadow border border-zinc-200 hover:bg-red-50"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Upload Photo Button */}
+                      {!isReadOnly && item.requiresPhoto && (
                         <label className={`shrink-0 flex flex-col items-center justify-center h-20 w-20 rounded-xl border-2 border-dashed cursor-pointer transition-all active:scale-95 ${
                           isUploading
                             ? 'border-indigo-300 bg-indigo-50'
@@ -461,6 +562,36 @@ export function ChecklistForm({
                           />
                         </label>
                       )}
+
+                      {/* Upload Video Button */}
+                      {!isReadOnly && item.requiresVideo && (
+                        <label className={`shrink-0 flex flex-col items-center justify-center h-20 w-20 rounded-xl border-2 border-dashed cursor-pointer transition-all active:scale-95 ${
+                          isUploadingVideo
+                            ? 'border-indigo-300 bg-indigo-50'
+                            : 'border-zinc-300 bg-zinc-50 hover:border-indigo-400 hover:bg-indigo-50'
+                        }`}>
+                          {isUploadingVideo ? (
+                            <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
+                          ) : (
+                            <>
+                              <Video className="w-5 h-5 text-zinc-400 mb-1" />
+                              <span className="text-[10px] font-medium text-zinc-500">Video (≤10s)</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="video/*"
+                            capture="environment"
+                            className="hidden"
+                            disabled={isReadOnly || isUploadingVideo}
+                            onChange={e => {
+                              const file = e.target.files?.[0]
+                              if (file) handleVideoUpload(item.id, file)
+                              e.target.value = ''
+                            }}
+                          />
+                        </label>
+                      )}
                     </div>
                   </div>
                 )}
@@ -478,13 +609,13 @@ export function ChecklistForm({
                 </div>
 
                 {/* Inline Error Message (validation + upload errors) */}
-                {(itemError || itemErrors[`upload_${item.id}`]) && (
+                {itemError && (
                   <div className="px-4 pb-3 flex items-center gap-2 text-rose-600">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span className="text-xs font-semibold">{itemError || itemErrors[`upload_${item.id}`]}</span>
+                    <span className="text-xs font-semibold">{itemError}</span>
                   </div>
                 )}
-              </motion.div>
+              </div>
             )
           })}
         </div>

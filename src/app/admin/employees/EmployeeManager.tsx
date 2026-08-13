@@ -1,13 +1,21 @@
 'use client'
 
 import { useState } from 'react'
-import { createEmployee, deleteEmployee } from './actions'
+import { useRouter } from 'next/navigation'
 import { Trash2, UserPlus, Shield, User } from 'lucide-react'
+
+/**
+ * DEVELOPER NOTE: Terminology Drift
+ * The role "EMPLOYEE" was renamed to "OPERATOR" in the database and the UI.
+ * However, the internal codebase and components like this one (EmployeeManager) 
+ * still use the term "Employee". Treat "Employee" and "Operator" as synonymous.
+ */
 
 export function EmployeeManager({ initialProfiles, currentUserId }: { initialProfiles: any[], currentUserId: string }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const router = useRouter()
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -15,17 +23,31 @@ export function EmployeeManager({ initialProfiles, currentUserId }: { initialPro
     setError(null)
     setSuccess(null)
 
-    const formData = new FormData(e.currentTarget)
-    const res = await createEmployee(formData)
-
-    if (res.error) {
-      setError(res.error)
-    } else {
-      setSuccess('Employee created successfully!')
-      // Reset form
-      ;(e.target as HTMLFormElement).reset()
+    const form = e.currentTarget
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: (form.elements.namedItem('fullName') as HTMLInputElement).value,
+          email:    (form.elements.namedItem('email')    as HTMLInputElement).value,
+          password: (form.elements.namedItem('password') as HTMLInputElement).value,
+          role:     (form.elements.namedItem('role')     as HTMLSelectElement).value,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setError(data.error || 'Failed to create account.')
+      } else {
+        setSuccess('Employee created successfully!')
+        form.reset()
+        router.refresh()
+      }
+    } catch (err: any) {
+      setError(err.message || 'Network error. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const handleDelete = async (userId: string, name: string) => {
@@ -35,15 +57,22 @@ export function EmployeeManager({ initialProfiles, currentUserId }: { initialPro
     setError(null)
     setSuccess(null)
 
-    const res = await deleteEmployee(userId)
-
-    if (res.error) {
-      setError(res.error)
-    } else {
-      setSuccess('Employee deleted successfully!')
+    try {
+      const res = await fetch(`/api/employees?userId=${userId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setError(data.error || 'Failed to delete account.')
+      } else {
+        setSuccess('Employee deleted successfully!')
+        router.refresh()
+      }
+    } catch (err: any) {
+      setError(err.message || 'Network error. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
+
 
   return (
     <div className="space-y-8">
@@ -73,7 +102,8 @@ export function EmployeeManager({ initialProfiles, currentUserId }: { initialPro
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">Role</label>
             <select name="role" className="w-full rounded-md border-zinc-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border">
-              <option value="EMPLOYEE">Employee</option>
+              <option value="OPERATOR">Operator</option>
+              <option value="REVIEWER">Reviewer</option>
               <option value="ADMIN">Admin</option>
             </select>
           </div>
@@ -104,7 +134,11 @@ export function EmployeeManager({ initialProfiles, currentUserId }: { initialPro
               {initialProfiles.map(profile => (
                 <tr key={profile.id} className="hover:bg-zinc-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900 flex items-center gap-2">
-                    {profile.role === 'ADMIN' ? <Shield className="w-4 h-4 text-indigo-500" /> : <User className="w-4 h-4 text-zinc-400" />}
+                    {profile.role === 'ADMIN'
+                      ? <Shield className="w-4 h-4 text-indigo-500" />
+                      : profile.role === 'REVIEWER'
+                      ? <Shield className="w-4 h-4 text-amber-500" />
+                      : <User className="w-4 h-4 text-zinc-400" />}
                     {profile.fullName}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">
@@ -112,7 +146,11 @@ export function EmployeeManager({ initialProfiles, currentUserId }: { initialPro
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">
                     <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset ${
-                      profile.role === 'ADMIN' ? 'bg-indigo-50 text-indigo-700 ring-indigo-600/20' : 'bg-zinc-50 text-zinc-600 ring-zinc-500/10'
+                      profile.role === 'ADMIN'
+                        ? 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
+                        : profile.role === 'REVIEWER'
+                        ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                        : 'bg-zinc-50 text-zinc-600 ring-zinc-500/10'
                     }`}>
                       {profile.role}
                     </span>

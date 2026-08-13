@@ -13,7 +13,7 @@ model Profile {
   fullName            String
   email               String                @unique
   phone               String?
-  role                Role                  @default(EMPLOYEE)
+  role                Role                  @default(OPERATOR)
   department          String?
   isActive            Boolean               @default(true)
   avatarUrl           String?
@@ -29,16 +29,17 @@ model Profile {
 }
 
 model ChecklistTemplate {
-  id          String                @id @default(uuid()) @db.Uuid
-  title       String
-  description String?
-  category    String
-  isActive    Boolean               @default(true)
-  createdById String                @db.Uuid
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
-  assignments ChecklistAssignment[]
-  items       ChecklistItem[]
+  id               String                @id @default(uuid()) @db.Uuid
+  title            String
+  description      String?
+  category         String
+  isActive         Boolean               @default(true)
+  isAuditTemplate  Boolean               @default(false)
+  createdById      String                @db.Uuid
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  assignments      ChecklistAssignment[]
+  items            ChecklistItem[]
 
   @@map("checklist_templates")
 }
@@ -51,6 +52,7 @@ model ChecklistItem {
   type            ItemType          @default(REQUIRED)
   sortOrder       Int               @default(0)
   requiresPhoto   Boolean           @default(false)
+  requiresVideo   Boolean           @default(false)
   isActive        Boolean           @default(true)
   template        ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   submissionItems SubmissionItem[]
@@ -89,6 +91,7 @@ model ChecklistSubmission {
   submittedBy   Profile             @relation("SubmittedBy", fields: [submittedById], references: [id])
   comments      Comment[]
   photos        Photo[]
+  videos        Video[]
   history       StatusHistory[]
   items         SubmissionItem[]
 
@@ -102,6 +105,7 @@ model SubmissionItem {
   isChecked       Boolean             @default(false)
   note            String?
   photos          Photo[]
+  videos          Video[]
   checklistItem   ChecklistItem       @relation(fields: [checklistItemId], references: [id])
   submission      ChecklistSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
@@ -121,6 +125,20 @@ model Photo {
   submissionItem   SubmissionItem?     @relation(fields: [submissionItemId], references: [id])
 
   @@map("photos")
+}
+
+model Video {
+  id               String              @id @default(uuid()) @db.Uuid
+  submissionId     String              @db.Uuid
+  submissionItemId String?             @db.Uuid
+  storagePath      String
+  fileName         String
+  fileSizeBytes    Int?
+  uploadedAt       DateTime            @default(now())
+  submission       ChecklistSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionItem   SubmissionItem?     @relation(fields: [submissionItemId], references: [id])
+
+  @@map("videos")
 }
 
 model Comment {
@@ -150,8 +168,9 @@ model StatusHistory {
 }
 
 enum Role {
-  EMPLOYEE
+  OPERATOR
   ADMIN
+  REVIEWER
 }
 
 enum ChecklistStatus {

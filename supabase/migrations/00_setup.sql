@@ -136,3 +136,26 @@ CREATE POLICY "Authenticated users can upload photos" ON storage.objects
 
 CREATE POLICY "Everyone can read photos" ON storage.objects
   FOR SELECT USING (bucket_id = 'checklist-photos');
+
+
+-- 10. Videos: Same logic
+ALTER TABLE "videos" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Employees see own videos" ON "videos"
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM checklist_submissions cs WHERE cs.id = "submissionId" AND cs."submittedById" = auth.uid())
+    OR EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'ADMIN')
+  );
+CREATE POLICY "Employees can manage own videos" ON "videos"
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM checklist_submissions cs WHERE cs.id = "submissionId" AND cs."submittedById" = auth.uid())
+    OR EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'ADMIN')
+  );
+
+INSERT INTO storage.buckets (id, name, public) VALUES ('checklist-videos', 'checklist-videos', true) ON CONFLICT DO NOTHING;
+
+CREATE POLICY "Authenticated users can upload videos" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'checklist-videos' AND auth.role() = 'authenticated');
+
+CREATE POLICY "Everyone can read videos" ON storage.objects
+  FOR SELECT USING (bucket_id = 'checklist-videos');
+

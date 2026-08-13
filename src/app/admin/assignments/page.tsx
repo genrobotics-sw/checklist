@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export default async function AssignmentsPage() {
   const [templates, employees, assignments] = await Promise.all([
     prisma.checklistTemplate.findMany({ where: { isActive: true }, orderBy: { title: 'asc' } }),
-    prisma.profile.findMany({ where: { role: 'EMPLOYEE', isActive: true }, orderBy: { fullName: 'asc' } }),
+    prisma.profile.findMany({ where: { role: 'OPERATOR', isActive: true }, orderBy: { fullName: 'asc' } }),
     prisma.checklistAssignment.findMany({ 
       orderBy: { createdAt: 'desc' },
       include: {

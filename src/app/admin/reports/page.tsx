@@ -2,7 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { FileBarChart, Filter, CheckCircle2, XCircle, Clock, FileText, ExternalLink } from 'lucide-react'
+import {
+  FileBarChart, Filter, CheckCircle2, XCircle, Clock,
+  FileText, ExternalLink, Users, ChevronRight,
+} from 'lucide-react'
 import { ExportButtons } from './ExportButtons'
 import { formatDate } from '@/lib/utils'
 
@@ -30,17 +33,30 @@ export default async function ReportsPage({
     }
   }
 
-  const templates = await prisma.checklistTemplate.findMany({
-    where: { isActive: true },
-    orderBy: { title: 'asc' }
-  })
+  const [templates, operators] = await Promise.all([
+    prisma.checklistTemplate.findMany({
+      where: { isActive: true },
+      orderBy: { title: 'asc' }
+    }),
+    prisma.profile.findMany({
+      where: { role: 'OPERATOR', isActive: true },
+      orderBy: { fullName: 'asc' },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        _count: { select: { submissions: true } },
+      },
+    }),
+  ])
 
   const submissions = await prisma.checklistSubmission.findMany({
     where: whereClause,
     include: {
       submittedBy: true,
       reviewedBy: true,
-      assignment: { include: { template: true } }
+      assignment: { include: { template: true } },
+      items: { include: { photos: true } }
     },
     orderBy: { updatedAt: 'desc' }
   })
@@ -99,6 +115,39 @@ export default async function ReportsPage({
             <p className="text-2xl font-bold text-zinc-600">{draftCount}</p>
           </div>
         </div>
+      </div>
+
+      {/* Operator Reports */}
+      <div className="bg-white shadow-sm ring-1 ring-zinc-200 rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-zinc-200 flex items-center gap-2">
+          <Users className="w-5 h-5 text-indigo-600" />
+          <h2 className="text-base font-semibold text-zinc-900">Operator Reports</h2>
+          <span className="ml-auto text-xs text-zinc-400">{operators.length} operator{operators.length !== 1 ? 's' : ''}</span>
+        </div>
+        {operators.length === 0 ? (
+          <p className="px-6 py-8 text-sm text-zinc-400 text-center">No active operators found.</p>
+        ) : (
+          <ul className="divide-y divide-zinc-100">
+            {operators.map(op => (
+              <li key={op.id}>
+                <Link
+                  href={`/admin/reports/operator/${op.id}`}
+                  className="flex items-center gap-4 px-6 py-3 hover:bg-zinc-50 transition-colors group"
+                >
+                  <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                    {op.fullName?.[0]?.toUpperCase() ?? 'O'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-zinc-900 group-hover:text-indigo-700 transition-colors">{op.fullName}</p>
+                    <p className="text-xs text-zinc-400 truncate">{op.email}</p>
+                  </div>
+                  <span className="text-xs text-zinc-400 shrink-0">{op._count.submissions} submission{op._count.submissions !== 1 ? 's' : ''}</span>
+                  <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-indigo-500 transition-colors shrink-0" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Table Container */}
@@ -160,7 +209,7 @@ export default async function ReportsPage({
           <table className="min-w-full divide-y divide-zinc-200">
             <thead className="bg-zinc-50">
               <tr>
-                {['Template', 'Employee', 'Reviewer', 'Due Date', 'Last Updated', 'Status', 'Action'].map(h => (
+                {['Template', 'Operator', 'Reviewer', 'Due Date', 'Submitted On', 'Status', 'Action'].map(h => (
                   <th key={h} className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -198,7 +247,7 @@ export default async function ReportsPage({
                         ) : <span className="text-zinc-300">—</span>}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">
-                        {formatDate(s.updatedAt)}
+                        {s.submittedAt ? formatDate(s.submittedAt) : <span className="text-zinc-300">—</span>}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${statusStyle(s.status)}`}>

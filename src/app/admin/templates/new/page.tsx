@@ -12,12 +12,13 @@ export default function NewTemplatePage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
-  const [items, setItems] = useState<{ id: string, label: string, type: 'REQUIRED' | 'OPTIONAL', requiresPhoto: boolean }[]>([
-    { id: crypto.randomUUID(), label: '', type: 'REQUIRED', requiresPhoto: false }
+  const [isAuditTemplate, setIsAuditTemplate] = useState(false)
+  const [items, setItems] = useState<{ id: string, label: string, type: 'REQUIRED' | 'OPTIONAL', requiresPhoto: boolean, requiresVideo: boolean }[]>([
+    { id: crypto.randomUUID(), label: '', type: 'REQUIRED', requiresPhoto: false, requiresVideo: false }
   ])
 
   const handleAddItem = () => {
-    setItems([...items, { id: crypto.randomUUID(), label: '', type: 'REQUIRED', requiresPhoto: false }])
+    setItems([...items, { id: crypto.randomUUID(), label: '', type: 'REQUIRED', requiresPhoto: false, requiresVideo: false }])
   }
 
   const handleRemoveItem = (id: string) => {
@@ -41,6 +42,7 @@ export default function NewTemplatePage() {
           title,
           description,
           category,
+          isAuditTemplate,
           items: items.map((item, index) => ({ ...item, sortOrder: index }))
         })
       })
@@ -109,6 +111,38 @@ export default function NewTemplatePage() {
           </div>
         </div>
 
+        {/* Audit Report Toggle */}
+        <div className="space-y-4 bg-white p-6 rounded-lg shadow-sm ring-1 ring-zinc-200">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-medium text-zinc-900">Audit Report</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                Enable this to include this template in the monthly audit report on each operator&apos;s report page. The audit report shows a calendar grid of daily ✓ / ✗ completions. No photos are included in the audit report.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAuditTemplate(!isAuditTemplate)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${
+                isAuditTemplate ? 'bg-indigo-600' : 'bg-zinc-200'
+              }`}
+              role="switch"
+              aria-checked={isAuditTemplate}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  isAuditTemplate ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+          {isAuditTemplate && (
+            <div className="rounded-md bg-indigo-50 px-4 py-3 text-sm text-indigo-700 ring-1 ring-inset ring-indigo-200">
+              ✓ Audit Report enabled — this template will appear on operator report pages under the &quot;Monthly Audit Report&quot; section.
+            </div>
+          )}
+        </div>
+
         <div className="space-y-4 bg-white p-6 rounded-lg shadow-sm ring-1 ring-zinc-200">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium text-zinc-900">Checklist Items</h2>
@@ -147,7 +181,16 @@ export default function NewTemplatePage() {
                         onChange={e => handleItemChange(item.id, 'requiresPhoto', e.target.checked)}
                         className="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-600"
                       />
-                      Requires Photo Proof
+                      Requires Photo
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-zinc-700">
+                      <input 
+                        type="checkbox" 
+                        checked={item.requiresVideo}
+                        onChange={e => handleItemChange(item.id, 'requiresVideo', e.target.checked)}
+                        className="rounded border-zinc-300 text-indigo-600 focus:ring-indigo-600"
+                      />
+                      Requires Video
                     </label>
                     <select 
                       value={item.type}

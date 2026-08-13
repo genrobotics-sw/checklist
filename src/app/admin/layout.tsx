@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import { AdminMobileNav } from '@/components/shared/AdminMobileNav'
 import { AdminSidebarLink } from '@/components/shared/AdminSidebarLink'
 
@@ -10,17 +9,20 @@ export default async function AdminLayout({
   children: React.ReactNode
 }) {
   const supabase = await createClient()
+  // Middleware already guards /admin routes; we only call getUser() to get
+  // the user id needed for the profile name + role query below.
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect('/login')
-  }
-
-  const { data: profile } = await supabase
+  const { data: profile } = user ? await supabase
     .from('profiles')
-    .select('fullName')
+    .select('fullName, role')
     .eq('id', user.id)
-    .single()
+    .single() : { data: null }
+
+  const role = profile?.role ?? 'ADMIN'
+  const isReviewer = role === 'REVIEWER'
+
+  const roleLabel = isReviewer ? 'Reviewer' : 'Administrator'
 
   return (
     <div className="fixed inset-0 flex overflow-hidden bg-zinc-100">
@@ -32,11 +34,19 @@ export default async function AdminLayout({
         </div>
         
         <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
-          <AdminSidebarLink href="/admin/dashboard" icon="home" label="Dashboard" />
-          <AdminSidebarLink href="/admin/templates" icon="templates" label="Templates" />
-          <AdminSidebarLink href="/admin/assignments" icon="assignments" label="Assignments" />
-          <AdminSidebarLink href="/admin/employees" icon="employees" label="Employees" />
-          <AdminSidebarLink href="/admin/reports" icon="reports" label="Reports" />
+          {isReviewer ? (
+            /* REVIEWER: submissions only */
+            <AdminSidebarLink href="/admin/submissions" icon="submissions" label="Submissions" />
+          ) : (
+            /* ADMIN: full nav */
+            <>
+              <AdminSidebarLink href="/admin/dashboard" icon="home" label="Dashboard" />
+              <AdminSidebarLink href="/admin/templates" icon="templates" label="Templates" />
+              <AdminSidebarLink href="/admin/assignments" icon="assignments" label="Assignments" />
+              <AdminSidebarLink href="/admin/employees" icon="employees" label="Employees" />
+              <AdminSidebarLink href="/admin/reports" icon="reports" label="Reports" />
+            </>
+          )}
         </nav>
 
         <div className="p-4 border-t border-white/10">
@@ -46,7 +56,7 @@ export default async function AdminLayout({
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-white truncate group-hover:text-indigo-300 transition-colors">{profile?.fullName ?? 'Admin'}</p>
-              <p className="text-xs text-zinc-500">Administrator</p>
+              <p className="text-xs text-zinc-500">{roleLabel}</p>
             </div>
           </Link>
           <form action="/auth/signout" method="post" className="mt-2">
@@ -57,7 +67,7 @@ export default async function AdminLayout({
 
       {/* Main Content */}
       <main className="flex-1 min-h-0 overflow-y-auto">
-        <AdminMobileNav />
+        <AdminMobileNav role={role} />
 
         <div className="p-6 md:p-8 max-w-6xl mx-auto">
           {children}
@@ -66,3 +76,4 @@ export default async function AdminLayout({
     </div>
   )
 }
+

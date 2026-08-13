@@ -2,23 +2,30 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Menu, X, Home, ClipboardList, Users, FileBarChart, UsersRound, UserCircle } from 'lucide-react'
+import { Menu, X, Home, ClipboardList, Users, FileBarChart, UsersRound, UserCircle, ClipboardCheck } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
-export function AdminMobileNav() {
+const ALL_LINKS = [
+  { href: '/admin/dashboard', icon: Home, label: 'Dashboard' },
+  { href: '/admin/templates', icon: ClipboardList, label: 'Templates' },
+  { href: '/admin/assignments', icon: Users, label: 'Assignments' },
+  { href: '/admin/employees', icon: UsersRound, label: 'Employees' },
+  { href: '/admin/reports', icon: FileBarChart, label: 'Reports' },
+  { href: '/admin/profile', icon: UserCircle, label: 'Profile' },
+]
+
+const REVIEWER_LINKS = [
+  { href: '/admin/submissions', icon: ClipboardCheck, label: 'Submissions' },
+  { href: '/admin/profile', icon: UserCircle, label: 'Profile' },
+]
+
+export function AdminMobileNav({ role }: { role?: string }) {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
 
   const closeMenu = () => setIsOpen(false)
 
-  const links = [
-    { href: '/admin/dashboard', icon: Home, label: 'Dashboard' },
-    { href: '/admin/templates', icon: ClipboardList, label: 'Templates' },
-    { href: '/admin/assignments', icon: Users, label: 'Assignments' },
-    { href: '/admin/employees', icon: UsersRound, label: 'Employees' },
-    { href: '/admin/reports', icon: FileBarChart, label: 'Reports' },
-    { href: '/admin/profile', icon: UserCircle, label: 'Profile' }
-  ]
+  const links = role === 'REVIEWER' ? REVIEWER_LINKS : ALL_LINKS
 
   return (
     <div className="md:hidden">
@@ -71,3 +78,4 @@ export function AdminMobileNav() {
     </div>
   )
 }
+

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
 import { sendEmail } from '@/lib/email'
+import { revalidatePath } from 'next/cache'
 
 const reviewSchema = z.object({
   status: z.enum(['APPROVED', 'REJECTED']),
@@ -25,7 +26,9 @@ export async function POST(
       .eq('id', user.id)
       .single()
 
-    if (profile?.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (profile?.role !== 'ADMIN' && profile?.role !== 'REVIEWER') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const { id: submissionId } = await params
     const body = await request.json()
@@ -80,6 +83,12 @@ export async function POST(
         })
       }
     })
+
+    // Invalidate cached pages so all parties see fresh data immediately.
+    revalidatePath('/admin/submissions')
+    revalidatePath('/admin/dashboard')
+    revalidatePath('/employee/checklists')
+    revalidatePath('/employee/dashboard')
 
     // Fire-and-forget: respond to admin immediately, notify employee in the background
     if (submission.submittedBy?.email) {

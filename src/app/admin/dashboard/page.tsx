@@ -2,7 +2,7 @@ import Link from 'next/link'
 import prisma from '@/lib/prisma'
 import { ClipboardList, Users, CheckCircle2, Clock, HardDrive, ArrowRight } from 'lucide-react'
 
-export const dynamic = 'force-dynamic'
+// Data is cached by Next.js and revalidated by revalidatePath after mutations.
 
 export default async function AdminDashboardPage() {
   const [templateCount, assignmentCount, pendingCount, approvedCount] = await Promise.all([
@@ -14,7 +14,7 @@ export default async function AdminDashboardPage() {
 
   let storageBytes = 0
   try {
-    const result: any = await prisma.$queryRaw`SELECT SUM(COALESCE((metadata->>'size')::bigint, 0)) as total_bytes FROM storage.objects WHERE bucket_id = 'checklist-photos';`
+    const result: any = await prisma.$queryRaw`SELECT SUM(COALESCE((metadata->>'size')::bigint, 0)) as total_bytes FROM storage.objects WHERE bucket_id IN ('checklist-photos', 'checklist-videos');`
     if (result && result[0] && result[0].total_bytes) {
       storageBytes = Number(result[0].total_bytes)
     }
@@ -113,7 +113,7 @@ export default async function AdminDashboardPage() {
               <HardDrive className="h-5 w-5 text-zinc-500" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-zinc-900">Photo Storage</p>
+              <p className="text-sm font-semibold text-zinc-900">Media Storage</p>
               <p className="text-xs text-zinc-500">{formatBytes(storageBytes)} used of 1 GB</p>
             </div>
           </div>

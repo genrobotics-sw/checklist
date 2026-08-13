@@ -3,6 +3,13 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { EmployeeNavLink } from '@/components/shared/EmployeeNavLink'
 
+/**
+ * DEVELOPER NOTE: Terminology Drift
+ * The role "EMPLOYEE" was renamed to "OPERATOR" in the database and the UI.
+ * However, the internal codebase, folder structure (e.g. /employee/*), and components 
+ * still use the term "Employee". Treat "Employee" and "Operator" as synonymous.
+ */
+
 export default async function EmployeeLayout({
   children,
 }: {
@@ -21,11 +28,18 @@ export default async function EmployeeLayout({
           <img src="/icon-512x512.png" alt="G-list" className="h-7 w-7 rounded-lg" />
           <span className="font-bold text-white tracking-tight">G-list</span>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/employee/profile" className="text-sm text-zinc-400 hover:text-white transition-colors hidden md:block">
+        <div className="hidden md:flex items-center gap-5">
+          <Link href="/employee/dashboard" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+            Home
+          </Link>
+          <Link href="/employee/checklists" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+            My Tasks
+          </Link>
+          <Link href="/employee/profile" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
             Profile
           </Link>
-          <form action="/auth/signout" method="post" className="hidden md:block">
+          <div className="h-4 w-px bg-white/20"></div>
+          <form action="/auth/signout" method="post">
             <button type="submit" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
               Sign out
             </button>

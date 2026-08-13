@@ -1,14 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { ChecklistForm } from './ChecklistForm'
 
 export default async function ChecklistPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params
   const supabase = await createClient()
+  // Middleware already guards this route; getUser() here is only needed to
+  // verify submission ownership (submittedById === user.id).
   const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
 
   const submission = await prisma.checklistSubmission.findUnique({
     where: { id: params.id },
@@ -27,7 +27,8 @@ export default async function ChecklistPage(props: { params: Promise<{ id: strin
       },
       items: {
         include: {
-          photos: true
+          photos: true,
+          videos: true
         }
       },
       comments: {
@@ -37,7 +38,7 @@ export default async function ChecklistPage(props: { params: Promise<{ id: strin
     }
   })
 
-  if (!submission || submission.submittedById !== user.id) {
+  if (!submission || submission.submittedById !== user?.id) {
     notFound()
   }
 
@@ -53,7 +54,12 @@ export default async function ChecklistPage(props: { params: Promise<{ id: strin
         url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/checklist-photos/${p.storagePath}`,
         path: p.storagePath,
         name: p.fileName
-      }))
+      })),
+      videos: ans.videos?.map((v: any) => ({
+        url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/checklist-videos/${v.storagePath}`,
+        path: v.storagePath,
+        name: v.fileName
+      })) || []
     }
   })
 

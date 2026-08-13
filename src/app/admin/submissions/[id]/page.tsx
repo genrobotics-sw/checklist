@@ -1,24 +1,12 @@
-import { createClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { ReviewActions } from './ReviewActions'
 import { Check, X } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
 export default async function AdminSubmissionPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'ADMIN') redirect('/employee/dashboard')
+  // Auth & role are already enforced by middleware (proxy.ts).
 
   const submission = await prisma.checklistSubmission.findUnique({
     where: { id: params.id },
@@ -37,7 +25,8 @@ export default async function AdminSubmissionPage(props: { params: Promise<{ id:
       },
       items: {
         include: {
-          photos: true
+          photos: true,
+          videos: true
         }
       }
     }
@@ -97,13 +86,25 @@ export default async function AdminSubmissionPage(props: { params: Promise<{ id:
                   {ans?.photos && ans.photos.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-3">
                       {ans.photos.map((photo: any, idx: number) => (
-                        <a key={idx} href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/checklist-photos/${photo.storagePath}`} target="_blank" rel="noreferrer">
+                        <a key={`photo-${idx}`} href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/checklist-photos/${photo.storagePath}`} target="_blank" rel="noreferrer">
                           <img 
                             src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/checklist-photos/${photo.storagePath}`} 
                             alt={`Evidence ${idx + 1}`} 
                             className="h-32 object-contain rounded ring-1 ring-zinc-200" 
                           />
                         </a>
+                      ))}
+                    </div>
+                  )}
+                  {ans?.videos && ans.videos.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {ans.videos.map((video: any, idx: number) => (
+                        <video 
+                          key={`video-${idx}`} 
+                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/checklist-videos/${video.storagePath}`} 
+                          controls
+                          className="h-48 object-contain rounded ring-1 ring-zinc-200 bg-black" 
+                        />
                       ))}
                     </div>
                   )}

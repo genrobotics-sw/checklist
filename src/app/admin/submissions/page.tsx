@@ -1,30 +1,14 @@
-import { createClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ChecklistStatus } from '@prisma/client'
 import { formatDate } from '@/lib/utils'
-
-export const dynamic = 'force-dynamic'
 
 export default async function AdminSubmissionsList({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'ADMIN') redirect('/employee/dashboard')
-
+  // Auth & role are already enforced by middleware (proxy.ts).
   const { status } = await searchParams
 
   const whereClause: any = {}

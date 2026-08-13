@@ -1,12 +1,15 @@
 import { PrismaClient } from '@prisma/client'
 
 const prismaClientSingleton = () => {
-  // connection_limit=1 prevents pool exhaustion in Next.js serverless/SSR renders
-  // connect_timeout surfaces failures fast instead of hanging indefinitely
+  // connect_timeout surfaces failures fast instead of hanging indefinitely.
+  // NOTE: We intentionally do NOT set connection_limit=1 here because that
+  // causes "$transaction" calls to fail with "Transaction not found / old
+  // closed transaction" errors — a single pooled connection cannot hold a
+  // transaction open across multiple sequential async queries.
   const dbUrl = process.env.DATABASE_URL
   const url = dbUrl?.includes('?')
-    ? `${dbUrl}&connection_limit=1&connect_timeout=10`
-    : `${dbUrl}?connection_limit=1&connect_timeout=10`
+    ? `${dbUrl}&connect_timeout=10`
+    : `${dbUrl}?connect_timeout=10`
 
   return new PrismaClient({
     datasources: { db: { url } },
