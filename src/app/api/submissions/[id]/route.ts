@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
 import { sendEmail } from '@/lib/email'
@@ -174,21 +174,24 @@ export async function POST(
     }
 
     if (submitForReview) {
-      // Fire-and-forget: don't block the response waiting for email
-      prisma.profile.findMany({
-        where: { role: { in: ['ADMIN', 'REVIEWER'] }, isActive: true },
-        select: { email: true }
-      }).then(admins => {
-        for (const admin of admins) {
-          if (admin.email) {
-            sendEmail({
-              to: admin.email,
-              subject: 'New Task Submission for Review',
-              text: 'A new task has been submitted for review. Please log in to G-list to review it.'
-            }).catch(e => console.error('Failed to send admin email:', e))
-          }
-        }
-      }).catch(e => console.error('Failed to fetch admins for email:', e))
+      // Don't block the response waiting for email — after() runs this to
+      // completion on Vercel after the response has already been sent.
+      after(() =>
+        prisma.profile.findMany({
+          where: { role: { in: ['ADMIN', 'REVIEWER'] }, isActive: true },
+          select: { email: true }
+        }).then(admins =>
+          Promise.all(
+            admins
+              .filter(admin => admin.email)
+              .map(admin => sendEmail({
+                to: admin.email!,
+                subject: 'New Task Submission for Review',
+                text: 'A new task has been submitted for review. Please log in to G-list to review it.'
+              }).catch(e => console.error('Failed to send admin email:', e)))
+          )
+        ).catch(e => console.error('Failed to fetch admins for email:', e))
+      )
     }
 
     return NextResponse.json({ success: true })

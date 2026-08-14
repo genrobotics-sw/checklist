@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
@@ -90,12 +90,15 @@ export async function POST(
     revalidatePath('/employee/checklists')
     revalidatePath('/employee/dashboard')
 
-    // Fire-and-forget: respond to admin immediately, notify employee in the background
+    // Respond to admin immediately, notify employee in the background —
+    // after() runs this to completion on Vercel after the response is sent.
     if (submission.submittedBy?.email) {
       const subject = `Your task has been ${validatedData.status.toLowerCase()}`
       const text = `Hello ${submission.submittedBy.fullName},\n\nYour submission for task "${submission.assignment.template.title}" has been ${validatedData.status.toLowerCase()}.\n\n${validatedData.comment ? `Comment: ${validatedData.comment}` : ''}\n\nPlease log in to G-list for more details.`
-      sendEmail({ to: submission.submittedBy.email, subject, text })
-        .catch(e => console.error('Failed to send review notification email:', e))
+      after(() =>
+        sendEmail({ to: submission.submittedBy.email!, subject, text })
+          .catch(e => console.error('Failed to send review notification email:', e))
+      )
     }
 
     return NextResponse.json({ success: true })

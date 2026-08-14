@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
@@ -62,16 +62,21 @@ export async function POST(request: Request) {
       )
     )
 
-    // Fire-and-forget: respond immediately, send emails in the background
-    Promise.all(
-      assignments
-        .filter(a => a.assignedTo?.email)
-        .map(a => sendEmail({
-          to: a.assignedTo.email!,
-          subject: `New Task Assigned: ${a.template.title}`,
-          text: `Hello ${a.assignedTo.fullName},\n\nYou have been assigned a new task: ${a.template.title}.\nPlease log in to G-list to complete it.\n\nDue Date: ${a.dueDate ? formatDate(a.dueDate) : 'None'}`
-        }))
-    ).catch(e => console.error('Failed to send assignment emails:', e))
+    // Respond immediately, send emails in the background — after() guarantees
+    // this runs to completion on Vercel even though the response has already
+    // been sent (a plain un-awaited promise gets killed when the function
+    // freezes right after the response is flushed).
+    after(() =>
+      Promise.all(
+        assignments
+          .filter(a => a.assignedTo?.email)
+          .map(a => sendEmail({
+            to: a.assignedTo.email!,
+            subject: `New Task Assigned: ${a.template.title}`,
+            text: `Hello ${a.assignedTo.fullName},\n\nYou have been assigned a new task: ${a.template.title}.\nPlease log in to G-list to complete it.\n\nDue Date: ${a.dueDate ? formatDate(a.dueDate) : 'None'}`
+          }))
+      ).catch(e => console.error('Failed to send assignment emails:', e))
+    )
 
     return NextResponse.json({ data: assignments })
   } catch (error: any) {
