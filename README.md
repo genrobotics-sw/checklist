@@ -6,9 +6,7 @@ G-list is a mobile-first checklist/audit management app. Admins build reusable c
 - **Repo:** `github.com/genrobotics-sw/checklist`
 - **Stack:** Next.js 16 (App Router) · React 19 · Prisma 5 + PostgreSQL (Supabase) · Supabase Auth & Storage · Tailwind · nodemailer
 
-> ⚠️ **This project runs on a pre-release Next.js version with breaking changes from what you may know** (see `AGENTS.md`). Notably: `src/proxy.ts` replaces the conventional `middleware.ts`, and `after()` from `next/server` is used for background work — both are load-bearing, not optional style choices. Check `node_modules/next/dist/docs/` before assuming standard Next.js behavior.
 
----
 
 ## Table of contents
 
