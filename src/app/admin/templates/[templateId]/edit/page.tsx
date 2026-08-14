@@ -205,19 +205,19 @@ export default function EditTemplatePage(props: { params: Promise<{ templateId: 
                 <div className="mt-2 text-zinc-400 cursor-move">
                   <GripVertical className="h-5 w-5" />
                 </div>
-                <div className="flex-1 space-y-4">
+                <div className="flex-1 min-w-0 space-y-4">
                   <div>
                     <label className="sr-only">Label</label>
-                    <input 
-                      required 
-                      type="text" 
+                    <input
+                      required
+                      type="text"
                       value={item.label}
                       onChange={e => handleItemChange(item.id, 'label', e.target.value)}
-                      className="block w-full rounded-md border-zinc-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border" 
+                      className="block w-full rounded-md border-zinc-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
                       placeholder="Item description (e.g., Check tire pressure)"
                     />
                   </div>
-                  <div className="flex items-center gap-6">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                     <label className="flex items-center gap-2 text-sm text-zinc-700">
                       <input 
                         type="checkbox" 
