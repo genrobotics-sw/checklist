@@ -91,7 +91,11 @@ export function AuditReportSection({ operatorId, operatorName, auditTemplates }:
         const sub = submissionsByDay[day]
         if (!sub) return '-'
         const subItem = sub.items?.find((i: any) => i.checklistItemId === item.id)
-        return subItem?.isChecked ? '✓' : '✗'
+        // jsPDF's built-in "helvetica" font only supports the WinAnsi
+        // character set, which has no ✓/✗ glyphs — those render as stray
+        // punctuation. Use plain ASCII letters instead, colored via
+        // didParseCell below to keep the same at-a-glance readability.
+        return subItem?.isChecked ? 'Y' : 'N'
       })
       return [item.label, ...rowData]
     })
@@ -111,6 +115,17 @@ export function AuditReportSection({ operatorId, operatorName, auditTemplates }:
         font: 'helvetica',
         cellPadding: 1.5,
         minCellHeight: 6,
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index > 0) {
+          if (data.cell.raw === 'Y') {
+            data.cell.styles.textColor = [22, 163, 74] // green-600
+            data.cell.styles.fontStyle = 'bold'
+          } else if (data.cell.raw === 'N') {
+            data.cell.styles.textColor = [220, 38, 38] // red-600
+            data.cell.styles.fontStyle = 'bold'
+          }
+        }
       }
     })
 
