@@ -12,10 +12,10 @@ import { Trash2, UserPlus, Shield, User, Crown } from 'lucide-react'
  */
 
 // Mirrors the server-side matrix in /api/employees: who can create/delete
-// which role. MASTER_ADMIN manages ADMIN accounts only; ADMIN manages
-// OPERATOR/REVIEWER accounts only. Neither manages MASTER_ADMIN.
+// which role. MASTER_ADMIN manages ADMIN, OPERATOR, and REVIEWER accounts;
+// ADMIN manages OPERATOR/REVIEWER only. Neither manages MASTER_ADMIN.
 const MANAGEABLE_ROLES: Record<string, string[]> = {
-  MASTER_ADMIN: ['ADMIN'],
+  MASTER_ADMIN: ['ADMIN', 'OPERATOR', 'REVIEWER'],
   ADMIN: ['OPERATOR', 'REVIEWER'],
 }
 

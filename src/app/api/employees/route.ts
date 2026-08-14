@@ -19,11 +19,12 @@ const getSupabaseAdmin = () =>
  * still use the term "Employee". Treat "Employee" and "Operator" as synonymous.
  */
 
-// Who's allowed to create which role. MASTER_ADMIN creates ADMIN accounts
-// only; ADMIN creates OPERATOR/REVIEWER accounts only. Neither can create
-// MASTER_ADMIN — that's bootstrapped directly, not through this UI.
+// Who's allowed to create which role. MASTER_ADMIN creates ADMIN, OPERATOR,
+// and REVIEWER accounts (everyone but another MASTER_ADMIN); ADMIN creates
+// OPERATOR/REVIEWER accounts only. Neither can create MASTER_ADMIN — that's
+// bootstrapped directly, not through this UI.
 const CREATABLE_ROLES_BY_CALLER: Record<string, string[]> = {
-  MASTER_ADMIN: ['ADMIN'],
+  MASTER_ADMIN: ['ADMIN', 'OPERATOR', 'REVIEWER'],
   ADMIN: ['OPERATOR', 'REVIEWER'],
 }
 
