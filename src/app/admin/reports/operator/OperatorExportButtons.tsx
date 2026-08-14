@@ -79,7 +79,10 @@ export function OperatorExportButtons({
       ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
     ].join('\n')
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    // Prepend a UTF-8 BOM so Excel detects the encoding correctly instead of
+    // guessing ANSI/Windows-1252 and garbling non-ASCII characters (e.g. the
+    // "—" used for missing dates below).
+    const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
