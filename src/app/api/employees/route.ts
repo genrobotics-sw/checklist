@@ -19,9 +19,17 @@ const getSupabaseAdmin = () =>
  * still use the term "Employee". Treat "Employee" and "Operator" as synonymous.
  */
 
+// Who's allowed to create which role. MASTER_ADMIN creates ADMIN accounts
+// only; ADMIN creates OPERATOR/REVIEWER accounts only. Neither can create
+// MASTER_ADMIN — that's bootstrapped directly, not through this UI.
+const CREATABLE_ROLES_BY_CALLER: Record<string, string[]> = {
+  MASTER_ADMIN: ['ADMIN'],
+  ADMIN: ['OPERATOR', 'REVIEWER'],
+}
+
 export async function POST(request: Request) {
   try {
-    // Auth guard — only ADMIN can create users
+    // Auth guard — only ADMIN / MASTER_ADMIN can create users
     const supabase = await createServerClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -32,7 +40,10 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (callerProfile?.role !== 'ADMIN') {
+    const callerRole = callerProfile?.role
+    const allowedRoles = callerRole ? CREATABLE_ROLES_BY_CALLER[callerRole] : undefined
+
+    if (!allowedRoles) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -43,8 +54,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'All fields are required.' }, { status: 400 })
     }
 
-    if (!['OPERATOR', 'REVIEWER', 'ADMIN'].includes(role)) {
-      return NextResponse.json({ error: 'Invalid role selected.' }, { status: 400 })
+    if (!allowedRoles.includes(role)) {
+      return NextResponse.json(
+        { error: `As ${callerRole === 'MASTER_ADMIN' ? 'Master Admin' : 'Admin'}, you can only create: ${allowedRoles.join(', ')}.` },
+        { status: 403 }
+      )
     }
 
     const supabaseAdmin = getSupabaseAdmin()
@@ -67,7 +81,7 @@ export async function POST(request: Request) {
 
       await prisma.profile.update({
         where: { id: authData.user.id },
-        data: { role: role as 'ADMIN' | 'OPERATOR' | 'REVIEWER', fullName },
+        data: { role: role as 'ADMIN' | 'OPERATOR' | 'REVIEWER' | 'MASTER_ADMIN', fullName },
       })
     }
 
@@ -94,6 +108,34 @@ export async function DELETE(request: Request) {
     if (!userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 })
     if (callerUser.id === userId) {
       return NextResponse.json({ error: 'You cannot delete your own account.' }, { status: 400 })
+    }
+
+    // Same role matrix as creation: MASTER_ADMIN can only remove ADMIN
+    // accounts; ADMIN can only remove OPERATOR/REVIEWER accounts.
+    const { data: callerProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', callerUser.id)
+      .single()
+
+    const callerRole = callerProfile?.role
+    const allowedRoles = callerRole ? CREATABLE_ROLES_BY_CALLER[callerRole] : undefined
+    if (!allowedRoles) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const targetProfile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    })
+    if (!targetProfile) {
+      return NextResponse.json({ error: 'User not found.' }, { status: 404 })
+    }
+    if (!allowedRoles.includes(targetProfile.role)) {
+      return NextResponse.json(
+        { error: `As ${callerRole === 'MASTER_ADMIN' ? 'Master Admin' : 'Admin'}, you can only delete: ${allowedRoles.join(', ')}.` },
+        { status: 403 }
+      )
     }
 
     const supabaseAdmin = getSupabaseAdmin()

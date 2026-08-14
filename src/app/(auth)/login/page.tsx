@@ -39,6 +39,10 @@ function LoginForm() {
 
       if (profile?.role === 'ADMIN') {
         router.push('/admin/dashboard')
+      } else if (profile?.role === 'MASTER_ADMIN') {
+        router.push('/admin/employees')
+      } else if (profile?.role === 'REVIEWER') {
+        router.push('/admin/submissions')
       } else {
         router.push('/employee/dashboard')
       }

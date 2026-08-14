@@ -16,7 +16,7 @@ export default async function EmployeesPage() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'ADMIN') redirect('/employee/dashboard')
+  if (profile?.role !== 'ADMIN' && profile?.role !== 'MASTER_ADMIN') redirect('/employee/dashboard')
 
   const profiles = await prisma.profile.findMany({
     where: { isActive: true },
@@ -35,7 +35,7 @@ export default async function EmployeesPage() {
         </h1>
       </div>
 
-      <EmployeeManager initialProfiles={profiles} currentUserId={user.id} />
+      <EmployeeManager initialProfiles={profiles} currentUserId={user.id} currentUserRole={profile.role} />
     </div>
   )
 }

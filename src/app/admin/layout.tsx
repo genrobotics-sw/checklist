@@ -21,8 +21,9 @@ export default async function AdminLayout({
 
   const role = profile?.role ?? 'ADMIN'
   const isReviewer = role === 'REVIEWER'
+  const isMasterAdmin = role === 'MASTER_ADMIN'
 
-  const roleLabel = isReviewer ? 'Reviewer' : 'Administrator'
+  const roleLabel = isReviewer ? 'Reviewer' : isMasterAdmin ? 'Master Admin' : 'Administrator'
 
   return (
     <div className="fixed inset-0 flex overflow-hidden bg-zinc-100">
@@ -37,6 +38,9 @@ export default async function AdminLayout({
           {isReviewer ? (
             /* REVIEWER: submissions only */
             <AdminSidebarLink href="/admin/submissions" icon="submissions" label="Submissions" />
+          ) : isMasterAdmin ? (
+            /* MASTER_ADMIN: employees only (creates/removes ADMIN accounts) */
+            <AdminSidebarLink href="/admin/employees" icon="employees" label="Employees" />
           ) : (
             /* ADMIN: full nav */
             <>

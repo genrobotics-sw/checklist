@@ -2,16 +2,32 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Trash2, UserPlus, Shield, User } from 'lucide-react'
+import { Trash2, UserPlus, Shield, User, Crown } from 'lucide-react'
 
 /**
  * DEVELOPER NOTE: Terminology Drift
  * The role "EMPLOYEE" was renamed to "OPERATOR" in the database and the UI.
- * However, the internal codebase and components like this one (EmployeeManager) 
+ * However, the internal codebase and components like this one (EmployeeManager)
  * still use the term "Employee". Treat "Employee" and "Operator" as synonymous.
  */
 
-export function EmployeeManager({ initialProfiles, currentUserId }: { initialProfiles: any[], currentUserId: string }) {
+// Mirrors the server-side matrix in /api/employees: who can create/delete
+// which role. MASTER_ADMIN manages ADMIN accounts only; ADMIN manages
+// OPERATOR/REVIEWER accounts only. Neither manages MASTER_ADMIN.
+const MANAGEABLE_ROLES: Record<string, string[]> = {
+  MASTER_ADMIN: ['ADMIN'],
+  ADMIN: ['OPERATOR', 'REVIEWER'],
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  OPERATOR: 'Operator',
+  REVIEWER: 'Reviewer',
+  ADMIN: 'Admin',
+  MASTER_ADMIN: 'Master Admin',
+}
+
+export function EmployeeManager({ initialProfiles, currentUserId, currentUserRole }: { initialProfiles: any[], currentUserId: string, currentUserRole: string }) {
+  const manageableRoles = MANAGEABLE_ROLES[currentUserRole] ?? []
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -102,9 +118,9 @@ export function EmployeeManager({ initialProfiles, currentUserId }: { initialPro
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">Role</label>
             <select name="role" className="w-full rounded-md border-zinc-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border">
-              <option value="OPERATOR">Operator</option>
-              <option value="REVIEWER">Reviewer</option>
-              <option value="ADMIN">Admin</option>
+              {manageableRoles.map(role => (
+                <option key={role} value={role}>{ROLE_LABELS[role] ?? role}</option>
+              ))}
             </select>
           </div>
           <div className="md:col-span-2 pt-2">
@@ -134,7 +150,9 @@ export function EmployeeManager({ initialProfiles, currentUserId }: { initialPro
               {initialProfiles.map(profile => (
                 <tr key={profile.id} className="hover:bg-zinc-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900 flex items-center gap-2">
-                    {profile.role === 'ADMIN'
+                    {profile.role === 'MASTER_ADMIN'
+                      ? <Crown className="w-4 h-4 text-purple-500" />
+                      : profile.role === 'ADMIN'
                       ? <Shield className="w-4 h-4 text-indigo-500" />
                       : profile.role === 'REVIEWER'
                       ? <Shield className="w-4 h-4 text-amber-500" />
@@ -146,13 +164,15 @@ export function EmployeeManager({ initialProfiles, currentUserId }: { initialPro
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">
                     <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset ${
-                      profile.role === 'ADMIN'
+                      profile.role === 'MASTER_ADMIN'
+                        ? 'bg-purple-50 text-purple-700 ring-purple-600/20'
+                        : profile.role === 'ADMIN'
                         ? 'bg-indigo-50 text-indigo-700 ring-indigo-600/20'
                         : profile.role === 'REVIEWER'
                         ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
                         : 'bg-zinc-50 text-zinc-600 ring-zinc-500/10'
                     }`}>
-                      {profile.role}
+                      {ROLE_LABELS[profile.role] ?? profile.role}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -160,7 +180,7 @@ export function EmployeeManager({ initialProfiles, currentUserId }: { initialPro
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200">
                         You
                       </span>
-                    ) : (
+                    ) : manageableRoles.includes(profile.role) ? (
                       <button
                         onClick={() => handleDelete(profile.id, profile.fullName)}
                         disabled={loading}
@@ -168,6 +188,8 @@ export function EmployeeManager({ initialProfiles, currentUserId }: { initialPro
                       >
                         <Trash2 className="w-4 h-4" /> Delete
                       </button>
+                    ) : (
+                      <span className="text-zinc-300">—</span>
                     )}
                   </td>
                 </tr>

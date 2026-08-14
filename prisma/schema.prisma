@@ -171,6 +171,7 @@ enum Role {
   OPERATOR
   ADMIN
   REVIEWER
+  MASTER_ADMIN
 }
 
 enum ChecklistStatus {
