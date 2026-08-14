@@ -19,23 +19,15 @@ const REVIEWER_LINKS = [
   { href: '/admin/profile', icon: UserCircle, label: 'Profile' },
 ]
 
-// MASTER_ADMIN's only job is creating/removing ADMIN accounts — no
-// templates, assignments, submissions, or reports access.
-const MASTER_ADMIN_LINKS = [
-  { href: '/admin/employees', icon: UsersRound, label: 'Employees' },
-  { href: '/admin/profile', icon: UserCircle, label: 'Profile' },
-]
-
 export function AdminMobileNav({ role }: { role?: string }) {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
 
   const closeMenu = () => setIsOpen(false)
 
-  const links =
-    role === 'REVIEWER' ? REVIEWER_LINKS :
-    role === 'MASTER_ADMIN' ? MASTER_ADMIN_LINKS :
-    ALL_LINKS
+  // ADMIN and MASTER_ADMIN both get the full nav — MASTER_ADMIN has
+  // everything ADMIN has, plus the ability to manage ADMIN accounts.
+  const links = role === 'REVIEWER' ? REVIEWER_LINKS : ALL_LINKS
 
   return (
     <div className="md:hidden">

@@ -37,10 +37,8 @@ function LoginForm() {
         .eq('id', data.user.id)
         .single()
 
-      if (profile?.role === 'ADMIN') {
+      if (profile?.role === 'ADMIN' || profile?.role === 'MASTER_ADMIN') {
         router.push('/admin/dashboard')
-      } else if (profile?.role === 'MASTER_ADMIN') {
-        router.push('/admin/employees')
       } else if (profile?.role === 'REVIEWER') {
         router.push('/admin/submissions')
       } else {

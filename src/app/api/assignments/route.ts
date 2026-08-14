@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (profile?.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (profile?.role !== 'ADMIN' && profile?.role !== 'MASTER_ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const body = await request.json()
     const validatedData = createAssignmentSchema.parse(body)

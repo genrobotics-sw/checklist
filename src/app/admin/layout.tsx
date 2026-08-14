@@ -38,11 +38,8 @@ export default async function AdminLayout({
           {isReviewer ? (
             /* REVIEWER: submissions only */
             <AdminSidebarLink href="/admin/submissions" icon="submissions" label="Submissions" />
-          ) : isMasterAdmin ? (
-            /* MASTER_ADMIN: employees only (creates/removes ADMIN accounts) */
-            <AdminSidebarLink href="/admin/employees" icon="employees" label="Employees" />
           ) : (
-            /* ADMIN: full nav */
+            /* ADMIN / MASTER_ADMIN: full nav */
             <>
               <AdminSidebarLink href="/admin/dashboard" icon="home" label="Dashboard" />
               <AdminSidebarLink href="/admin/templates" icon="templates" label="Templates" />

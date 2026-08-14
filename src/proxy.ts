@@ -46,11 +46,10 @@ export async function proxy(request: NextRequest) {
         await supabase.auth.signOut()
         return supabaseResponse
       }
-      // REVIEWER lands on submissions; MASTER_ADMIN on employees; ADMIN on
-      // dashboard; OPERATOR on their dashboard
+      // REVIEWER lands on submissions; ADMIN/MASTER_ADMIN on dashboard;
+      // OPERATOR on their dashboard
       const dest =
-        role === 'ADMIN' ? '/admin/dashboard' :
-        role === 'MASTER_ADMIN' ? '/admin/employees' :
+        role === 'ADMIN' || role === 'MASTER_ADMIN' ? '/admin/dashboard' :
         role === 'REVIEWER' ? '/admin/submissions' :
         '/employee/dashboard'
       const redirectResponse = NextResponse.redirect(new URL(dest, request.url))
@@ -88,25 +87,14 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/submissions', request.url))
     }
 
-    // ── MASTER_ADMIN: can only access /admin/employees and /admin/profile ─────
-    // (their sole job is creating/removing ADMIN accounts — no templates,
-    // assignments, submissions, or reports access)
-    if (role === 'MASTER_ADMIN') {
-      if (
-        pathname.startsWith('/admin/employees') ||
-        pathname.startsWith('/admin/profile')
-      ) {
-        return supabaseResponse // ✅ allowed
-      }
-      return NextResponse.redirect(new URL('/admin/employees', request.url))
-    }
-
-    // ── ADMIN: full /admin access, no /employee access ─────────────────────────
-    if (pathname.startsWith('/admin') && role !== 'ADMIN') {
+    // ── ADMIN / MASTER_ADMIN: full /admin access, no /employee access ─────────
+    // MASTER_ADMIN has everything ADMIN has, plus the ability to manage
+    // ADMIN accounts (which ADMIN itself can't do) — see /api/employees.
+    if (pathname.startsWith('/admin') && role !== 'ADMIN' && role !== 'MASTER_ADMIN') {
       return NextResponse.redirect(new URL('/employee/dashboard', request.url))
     }
 
-    if (pathname.startsWith('/employee') && role === 'ADMIN') {
+    if (pathname.startsWith('/employee') && (role === 'ADMIN' || role === 'MASTER_ADMIN')) {
       return NextResponse.redirect(new URL('/admin/dashboard', request.url))
     }
   }
